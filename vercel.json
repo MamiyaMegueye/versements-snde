@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "functions": {
+    "api/index.py": {
+      "runtime": "@vercel/python@4.0.0",
+      "maxDuration": 30
+    }
+  }
+}
