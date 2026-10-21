@@ -4,3 +4,4 @@ psycopg[binary]
 python-jose[cryptography]
 python-multipart
 bcrypt
+openpyxl

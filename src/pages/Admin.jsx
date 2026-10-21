@@ -5,29 +5,30 @@ function formatMontant(n) {
   return Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 2 }) + ' MRU'
 }
 
-function exportExcel(data, centres) {
-  // Build CSV with BOM for Excel
-  const BOM = '﻿'
-  const headers = ['Centre', 'Date', 'Montant', 'Banque', 'Observations', 'Saisi par']
-  const rows = data.map(v => [
-    v.centre_nom,
-    v.date_versement,
-    v.montant,
-    v.banque || '',
-    v.observations || '',
-    v.saisi_par_nom || ''
-  ])
-  const csv = BOM + [headers, ...rows].map(r =>
-    r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(';')
-  ).join('\n')
+function exportExcel(filters) {
+  const token = localStorage.getItem('token')
+  const params = new URLSearchParams()
+  if (filters.centre_id) params.append('centre_id', filters.centre_id)
+  if (filters.date_debut) params.append('date_debut', filters.date_debut)
+  if (filters.date_fin) params.append('date_fin', filters.date_fin)
 
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `versements_${new Date().toISOString().slice(0,10)}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
+  const API = import.meta.env.VITE_API_URL || ''
+  fetch(`${API}/api/export?${params.toString()}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+    .then(res => {
+      if (!res.ok) throw new Error('Erreur export')
+      return res.blob()
+    })
+    .then(blob => {
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `versements_${new Date().toISOString().slice(0, 10)}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    })
+    .catch(err => alert('Erreur lors de l\'export: ' + err.message))
 }
 
 export default function Admin() {
@@ -131,7 +132,7 @@ export default function Admin() {
             </div>
             <div className="export-bar">
               <button className="btn btn-accent btn-sm"
-                onClick={() => exportExcel(versements.data, centres)}
+                onClick={() => exportExcel(filters)}
                 disabled={versements.data.length === 0}>
                 ⬇ Télécharger Excel
               </button>

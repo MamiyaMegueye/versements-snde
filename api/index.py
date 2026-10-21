@@ -6,6 +6,7 @@ FastAPI déployé comme fonction serverless Vercel
 import os
 import json
 import base64
+import io
 from datetime import datetime, timedelta, date
 from typing import Optional
 
@@ -13,10 +14,13 @@ import psycopg
 from psycopg.rows import dict_row
 import bcrypt as _bcrypt
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form, Query
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from pydantic import BaseModel
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 # ─── Configuration ───────────────────────────────────────────
 
@@ -406,6 +410,136 @@ def update_user(user_id: int, req: UserUpdate, user=Depends(require_admin)):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
+
+
+# ─── Export Excel ───────────────────────────────────────────
+
+@app.get("/api/export")
+def export_excel(
+    centre_id: Optional[int] = Query(None),
+    date_debut: Optional[str] = Query(None),
+    date_fin: Optional[str] = Query(None),
+    user=Depends(get_current_user),
+):
+    conn = db_conn()
+    try:
+        cur = conn.cursor()
+        conditions = []
+        params = []
+        if centre_id:
+            conditions.append("v.centre_id = %s")
+            params.append(centre_id)
+        if date_debut:
+            conditions.append("v.date_versement >= %s")
+            params.append(date_debut)
+        if date_fin:
+            conditions.append("v.date_versement <= %s")
+            params.append(date_fin)
+        where = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+        cur.execute(f"""
+            SELECT c.nom as centre_nom, v.date_versement, v.montant,
+                   v.banque, v.observations, u.nom_complet as saisi_par_nom
+            FROM versements v
+            JOIN centres c ON c.id = v.centre_id
+            LEFT JOIN utilisateurs u ON u.id = v.saisi_par
+            {where}
+            ORDER BY v.date_versement DESC
+        """, params)
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    # Créer le fichier Excel
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Versements"
+
+    # Couleurs
+    bleu_fonce = "0C2D5C"
+    bleu_header = "1E3A8A"
+    bleu_clair = "DBEAFE"
+    blanc = "FFFFFF"
+
+    thin_border = Border(
+        left=Side(style='thin', color='D1D5DB'),
+        right=Side(style='thin', color='D1D5DB'),
+        top=Side(style='thin', color='D1D5DB'),
+        bottom=Side(style='thin', color='D1D5DB'),
+    )
+
+    # Row 1: Titre
+    ws.merge_cells('A1:F1')
+    title_cell = ws['A1']
+    title_cell.value = "Versements Bancaires SNDE"
+    title_cell.font = Font(name='Calibri', size=18, bold=True, color=blanc)
+    title_cell.fill = PatternFill(start_color=bleu_fonce, end_color=bleu_fonce, fill_type='solid')
+    title_cell.alignment = Alignment(horizontal='center', vertical='center')
+    ws.row_dimensions[1].height = 40
+
+    # Row 2: Info
+    ws.merge_cells('A2:F2')
+    info_cell = ws['A2']
+    info_cell.value = f"{len(rows)} lignes"
+    info_cell.font = Font(name='Calibri', size=10, color='0F172A')
+    info_cell.fill = PatternFill(start_color=bleu_clair, end_color=bleu_clair, fill_type='solid')
+    ws.row_dimensions[2].height = 24
+
+    # Row 3: En-têtes
+    headers = ['Centre', 'Date', 'Montant', 'Banque', 'Observations', 'Saisi par']
+    header_colors = ['1E3A8A', '1E4DA8', '2560B5', '2D73C3', '3586D0', '3D99DD']
+    ws.row_dimensions[3].height = 28
+
+    for col_idx, (header, color) in enumerate(zip(headers, header_colors), 1):
+        cell = ws.cell(row=3, column=col_idx, value=header)
+        cell.font = Font(name='Calibri', size=11, bold=True, color=blanc)
+        cell.fill = PatternFill(start_color=color, end_color=color, fill_type='solid')
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = thin_border
+
+    # Données
+    for row_idx, row in enumerate(rows, 4):
+        data = [
+            row['centre_nom'],
+            str(row['date_versement']),
+            float(row['montant']),
+            row.get('banque') or '',
+            row.get('observations') or '',
+            row.get('saisi_par_nom') or '',
+        ]
+        is_even = (row_idx % 2 == 0)
+        row_fill = PatternFill(start_color='F8FAFC', end_color='F8FAFC', fill_type='solid') if is_even else PatternFill(fill_type=None)
+
+        for col_idx, val in enumerate(data, 1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=val)
+            cell.font = Font(name='Calibri', size=10)
+            cell.border = thin_border
+            if is_even:
+                cell.fill = row_fill
+            # Format montant
+            if col_idx == 3:
+                cell.number_format = '#,##0.00'
+                cell.alignment = Alignment(horizontal='right')
+
+    # Largeurs de colonnes
+    ws.column_dimensions['A'].width = 22
+    ws.column_dimensions['B'].width = 14
+    ws.column_dimensions['C'].width = 18
+    ws.column_dimensions['D'].width = 16
+    ws.column_dimensions['E'].width = 30
+    ws.column_dimensions['F'].width = 25
+
+    # Sauvegarder en mémoire
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f"versements_{datetime.utcnow().strftime('%Y-%m-%d')}.xlsx"
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 # ─── Health check ────────────────────────────────────────────
