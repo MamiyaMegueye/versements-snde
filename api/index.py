@@ -9,8 +9,8 @@ import base64
 from datetime import datetime, timedelta, date
 from typing import Optional
 
-import psycopg2
-import psycopg2.extras
+import psycopg
+from psycopg.rows import dict_row
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -41,16 +41,8 @@ security = HTTPBearer()
 
 # ─── Database ────────────────────────────────────────────────
 
-def get_db():
-    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-    try:
-        yield conn
-    finally:
-        conn.close()
-
-
 def db_conn():
-    return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 
 
 # ─── Auth helpers ────────────────────────────────────────────
