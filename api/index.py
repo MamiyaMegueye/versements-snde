@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form, Que
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
-from passlib.context import CryptContext
+import bcrypt as _bcrypt
 from pydantic import BaseModel
 
 # ─── Configuration ───────────────────────────────────────────
@@ -35,7 +35,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
 
 
@@ -115,7 +114,7 @@ def login(req: LoginRequest):
     finally:
         conn.close()
 
-    if not user or not pwd_context.verify(req.password, user["password_hash"]):
+    if not user or not _bcrypt.checkpw(req.password.encode(), user["password_hash"].encode()):
         raise HTTPException(status_code=401, detail="Identifiant ou mot de passe incorrect")
 
     if not user["actif"]:
@@ -363,7 +362,7 @@ def create_user(req: UserCreate, user=Depends(require_admin)):
         if cur.fetchone():
             raise HTTPException(status_code=400, detail="Ce nom d'utilisateur existe déjà")
 
-        hashed = pwd_context.hash(req.password)
+        hashed = _bcrypt.hashpw(req.password.encode(), _bcrypt.gensalt()).decode()
         cur.execute("""
             INSERT INTO utilisateurs (username, password_hash, nom_complet, role)
             VALUES (%s, %s, %s, %s) RETURNING id
@@ -395,7 +394,7 @@ def update_user(user_id: int, req: UserUpdate, user=Depends(require_admin)):
             params.append(req.actif)
         if req.password is not None:
             updates.append("password_hash = %s")
-            params.append(pwd_context.hash(req.password))
+            params.append(_bcrypt.hashpw(req.password.encode(), _bcrypt.gensalt()).decode())
 
         if not updates:
             raise HTTPException(status_code=400, detail="Rien à modifier")
