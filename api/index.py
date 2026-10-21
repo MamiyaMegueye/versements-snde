@@ -167,6 +167,7 @@ async def create_versement(
     centre_id: int = Form(...),
     date_versement: str = Form(...),
     montant: float = Form(...),
+    numero_versement: str = Form(""),
     banque: str = Form(""),
     observations: str = Form(""),
     image: Optional[UploadFile] = File(None),
@@ -190,7 +191,7 @@ async def create_versement(
             INSERT INTO versements (centre_id, date_versement, montant, banque, numero_bordereau, observations, image_bordereau, saisi_par)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
-        """, (centre_id, date_versement, montant, banque, "", observations, image_base64, user["id"]))
+        """, (centre_id, date_versement, montant, banque, numero_versement, observations, image_base64, user["id"]))
         versement_id = cur.fetchone()["id"]
 
         # Historique
@@ -245,7 +246,7 @@ def list_versements(
         # Données (sans l'image pour la liste)
         cur.execute(f"""
             SELECT v.id, v.centre_id, c.nom as centre_nom, v.date_versement,
-                   v.montant, v.banque, v.observations,
+                   v.montant, v.numero_bordereau as numero_versement, v.banque, v.observations,
                    CASE WHEN v.image_bordereau IS NOT NULL THEN true ELSE false END as a_image,
                    u.nom_complet as saisi_par_nom, v.date_saisie
             FROM versements v
@@ -439,6 +440,7 @@ def export_excel(
 
         cur.execute(f"""
             SELECT c.nom as centre_nom, v.date_versement, v.montant,
+                   v.numero_bordereau as numero_versement,
                    v.banque, v.observations, u.nom_complet as saisi_par_nom
             FROM versements v
             JOIN centres c ON c.id = v.centre_id
@@ -469,7 +471,7 @@ def export_excel(
     )
 
     # Row 1: Titre
-    ws.merge_cells('A1:F1')
+    ws.merge_cells('A1:G1')
     title_cell = ws['A1']
     title_cell.value = "Versements Bancaires SNDE"
     title_cell.font = Font(name='Calibri', size=18, bold=True, color=blanc)
@@ -478,7 +480,7 @@ def export_excel(
     ws.row_dimensions[1].height = 40
 
     # Row 2: Info
-    ws.merge_cells('A2:F2')
+    ws.merge_cells('A2:G2')
     info_cell = ws['A2']
     info_cell.value = f"{len(rows)} lignes"
     info_cell.font = Font(name='Calibri', size=10, color='0F172A')
@@ -486,8 +488,8 @@ def export_excel(
     ws.row_dimensions[2].height = 24
 
     # Row 3: En-têtes
-    headers = ['Centre', 'Date', 'Montant', 'Banque', 'Observations', 'Saisi par']
-    header_colors = ['1E3A8A', '1E4DA8', '2560B5', '2D73C3', '3586D0', '3D99DD']
+    headers = ['Centre', 'Date', 'Montant', 'N° Versement', 'Banque', 'Observations', 'Saisi par']
+    header_colors = ['1E3A8A', '1E4DA8', '2560B5', '2D73C3', '3586D0', '3D99DD', '45A5E5']
     ws.row_dimensions[3].height = 28
 
     for col_idx, (header, color) in enumerate(zip(headers, header_colors), 1):
@@ -503,6 +505,7 @@ def export_excel(
             row['centre_nom'],
             str(row['date_versement']),
             float(row['montant']),
+            row.get('numero_versement') or '',
             row.get('banque') or '',
             row.get('observations') or '',
             row.get('saisi_par_nom') or '',
@@ -526,8 +529,9 @@ def export_excel(
     ws.column_dimensions['B'].width = 14
     ws.column_dimensions['C'].width = 18
     ws.column_dimensions['D'].width = 16
-    ws.column_dimensions['E'].width = 30
-    ws.column_dimensions['F'].width = 25
+    ws.column_dimensions['E'].width = 16
+    ws.column_dimensions['F'].width = 30
+    ws.column_dimensions['G'].width = 25
 
     # Sauvegarder en mémoire
     output = io.BytesIO()

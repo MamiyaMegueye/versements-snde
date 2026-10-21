@@ -7,6 +7,7 @@ export default function Saisie() {
     centre_id: '',
     date_versement: new Date().toISOString().split('T')[0],
     montant: '',
+    numero_versement: '',
     banque: '',
     observations: '',
   })
@@ -57,6 +58,7 @@ export default function Saisie() {
     fd.append('centre_id', form.centre_id)
     fd.append('date_versement', form.date_versement)
     fd.append('montant', form.montant)
+    fd.append('numero_versement', form.numero_versement)
     fd.append('banque', form.banque)
     fd.append('observations', form.observations)
     if (image) fd.append('image', image)
@@ -68,6 +70,7 @@ export default function Saisie() {
         centre_id: '',
         date_versement: new Date().toISOString().split('T')[0],
         montant: '',
+        numero_versement: '',
         banque: '',
         observations: '',
       })
@@ -112,6 +115,13 @@ export default function Saisie() {
                 value={form.montant} onChange={handleChange} step="0.01" min="0" required
                 placeholder="0.00" />
             </div>
+          </div>
+
+          <div className="form-group">
+            <label>N° Versement *</label>
+            <input type="text" name="numero_versement" className="form-control"
+              value={form.numero_versement} onChange={handleChange} required
+              placeholder="Ex: 211656" />
           </div>
 
           <div className="form-row">

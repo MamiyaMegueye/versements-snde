@@ -146,6 +146,7 @@ export default function Admin() {
                   <th>Centre</th>
                   <th>Date</th>
                   <th>Montant</th>
+                  <th>N° Versement</th>
                   <th>Banque</th>
                   <th>Observations</th>
                   <th>Saisi par</th>
@@ -154,7 +155,7 @@ export default function Admin() {
               </thead>
               <tbody>
                 {versements.data.length === 0 && (
-                  <tr><td colSpan="7" className="text-center" style={{ padding: 40, color: 'var(--gray-500)' }}>
+                  <tr><td colSpan="8" className="text-center" style={{ padding: 40, color: 'var(--gray-500)' }}>
                     Aucun versement trouvé
                   </td></tr>
                 )}
@@ -163,6 +164,7 @@ export default function Admin() {
                     <td><strong>{v.centre_nom}</strong></td>
                     <td>{v.date_versement}</td>
                     <td className="montant">{formatMontant(v.montant)}</td>
+                    <td>{v.numero_versement || '—'}</td>
                     <td>{v.banque || '—'}</td>
                     <td>{v.observations || '—'}</td>
                     <td>{v.saisi_par_nom || '—'}</td>
