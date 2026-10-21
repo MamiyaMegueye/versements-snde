@@ -15,7 +15,7 @@ export default function Header() {
   return (
     <div className="header">
       <div className="header-left">
-        <img src="/logo-snde.webp" alt="SNDE" className="header-logo" />
+        <img src="/logo-snde.png" alt="SNDE" className="header-logo" />
         <h1>Versements Bancaires</h1>
       </div>
       <div className="header-right">

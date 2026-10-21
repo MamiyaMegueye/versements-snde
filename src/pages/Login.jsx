@@ -35,7 +35,7 @@ export default function Login() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <img src="/logo-snde.webp" alt="SNDE" className="login-logo" />
+        <img src="/logo-snde.png" alt="SNDE" className="login-logo" />
         <h2 className="login-title">Contrôle des Versements</h2>
         <p className="login-subtitle">Société Nationale Des Eaux</p>
 
