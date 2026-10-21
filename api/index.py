@@ -11,11 +11,11 @@ from typing import Optional
 
 import psycopg
 from psycopg.rows import dict_row
+import bcrypt as _bcrypt
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
-import bcrypt as _bcrypt
 from pydantic import BaseModel
 
 # ─── Configuration ───────────────────────────────────────────
@@ -45,6 +45,12 @@ def db_conn():
 
 
 # ─── Auth helpers ────────────────────────────────────────────
+
+def hash_password(password: str) -> str:
+    return _bcrypt.hashpw(password.encode(), _bcrypt.gensalt()).decode()
+
+def verify_password(password: str, hashed: str) -> bool:
+    return _bcrypt.checkpw(password.encode(), hashed.encode())
 
 def create_token(data: dict):
     to_encode = data.copy()
@@ -114,7 +120,7 @@ def login(req: LoginRequest):
     finally:
         conn.close()
 
-    if not user or not _bcrypt.checkpw(req.password.encode(), user["password_hash"].encode()):
+    if not user or not verify_password(req.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Identifiant ou mot de passe incorrect")
 
     if not user["actif"]:
@@ -158,7 +164,6 @@ async def create_versement(
     date_versement: str = Form(...),
     montant: float = Form(...),
     banque: str = Form(""),
-    numero_bordereau: str = Form(""),
     observations: str = Form(""),
     image: Optional[UploadFile] = File(None),
     user=Depends(get_current_user),
@@ -177,20 +182,11 @@ async def create_versement(
     conn = db_conn()
     try:
         cur = conn.cursor()
-        # Vérifier doublon (centre + numéro bordereau)
-        if numero_bordereau:
-            cur.execute(
-                "SELECT id FROM versements WHERE centre_id = %s AND numero_bordereau = %s",
-                (centre_id, numero_bordereau)
-            )
-            if cur.fetchone():
-                raise HTTPException(status_code=400, detail="Ce numéro de bordereau existe déjà pour ce centre")
-
         cur.execute("""
             INSERT INTO versements (centre_id, date_versement, montant, banque, numero_bordereau, observations, image_bordereau, saisi_par)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
-        """, (centre_id, date_versement, montant, banque, numero_bordereau, observations, image_base64, user["id"]))
+        """, (centre_id, date_versement, montant, banque, "", observations, image_base64, user["id"]))
         versement_id = cur.fetchone()["id"]
 
         # Historique
@@ -245,7 +241,7 @@ def list_versements(
         # Données (sans l'image pour la liste)
         cur.execute(f"""
             SELECT v.id, v.centre_id, c.nom as centre_nom, v.date_versement,
-                   v.montant, v.banque, v.numero_bordereau, v.observations,
+                   v.montant, v.banque, v.observations,
                    CASE WHEN v.image_bordereau IS NOT NULL THEN true ELSE false END as a_image,
                    u.nom_complet as saisi_par_nom, v.date_saisie
             FROM versements v
@@ -362,7 +358,7 @@ def create_user(req: UserCreate, user=Depends(require_admin)):
         if cur.fetchone():
             raise HTTPException(status_code=400, detail="Ce nom d'utilisateur existe déjà")
 
-        hashed = _bcrypt.hashpw(req.password.encode(), _bcrypt.gensalt()).decode()
+        hashed = hash_password(req.password)
         cur.execute("""
             INSERT INTO utilisateurs (username, password_hash, nom_complet, role)
             VALUES (%s, %s, %s, %s) RETURNING id
@@ -394,7 +390,7 @@ def update_user(user_id: int, req: UserUpdate, user=Depends(require_admin)):
             params.append(req.actif)
         if req.password is not None:
             updates.append("password_hash = %s")
-            params.append(_bcrypt.hashpw(req.password.encode(), _bcrypt.gensalt()).decode())
+            params.append(hash_password(req.password))
 
         if not updates:
             raise HTTPException(status_code=400, detail="Rien à modifier")

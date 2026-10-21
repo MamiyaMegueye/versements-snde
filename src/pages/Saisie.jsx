@@ -8,7 +8,6 @@ export default function Saisie() {
     date_versement: new Date().toISOString().split('T')[0],
     montant: '',
     banque: '',
-    numero_bordereau: '',
     observations: '',
   })
   const [image, setImage] = useState(null)
@@ -59,7 +58,6 @@ export default function Saisie() {
     fd.append('date_versement', form.date_versement)
     fd.append('montant', form.montant)
     fd.append('banque', form.banque)
-    fd.append('numero_bordereau', form.numero_bordereau)
     fd.append('observations', form.observations)
     if (image) fd.append('image', image)
 
@@ -71,7 +69,6 @@ export default function Saisie() {
         date_versement: new Date().toISOString().split('T')[0],
         montant: '',
         banque: '',
-        numero_bordereau: '',
         observations: '',
       })
       setImage(null)
@@ -119,30 +116,24 @@ export default function Saisie() {
 
           <div className="form-row">
             <div className="form-group">
-              <label>Banque</label>
+              <label>Banque <span className="optional-tag">(optionnel)</span></label>
               <input type="text" name="banque" className="form-control"
                 value={form.banque} onChange={handleChange} placeholder="Nom de la banque" />
             </div>
             <div className="form-group">
-              <label>N° Bordereau</label>
-              <input type="text" name="numero_bordereau" className="form-control"
-                value={form.numero_bordereau} onChange={handleChange} placeholder="Numéro du bordereau" />
+              <label>Observations <span className="optional-tag">(optionnel)</span></label>
+              <textarea name="observations" className="form-control"
+                value={form.observations} onChange={handleChange} placeholder="Notes ou remarques..." />
             </div>
           </div>
 
           <div className="form-group">
-            <label>Observations</label>
-            <textarea name="observations" className="form-control"
-              value={form.observations} onChange={handleChange} placeholder="Notes ou remarques..." />
-          </div>
-
-          <div className="form-group">
-            <label>Image du bordereau</label>
+            <label>Image du reçu <span className="optional-tag">(optionnel)</span></label>
             {!imagePreview ? (
               <div className="file-input-wrap">
                 <input type="file" accept="image/*" onChange={handleImage} />
                 <div className="file-input-label">
-                  📷 Cliquer ou glisser une image ici (max 3 Mo)
+                  Cliquer ou glisser une image ici (max 3 Mo)
                 </div>
               </div>
             ) : (

@@ -35,8 +35,9 @@ export default function Login() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h2 className="login-title">SNDE</h2>
-        <p className="login-subtitle">Suivi des Versements Bancaires</p>
+        <img src="/logo-snde.webp" alt="SNDE" className="login-logo" />
+        <h2 className="login-title">Contrôle des Versements</h2>
+        <p className="login-subtitle">Société Nationale Des Eaux</p>
 
         {error && <div className="alert alert-error">{error}</div>}
 

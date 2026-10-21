@@ -5,6 +5,31 @@ function formatMontant(n) {
   return Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 2 }) + ' MRU'
 }
 
+function exportExcel(data, centres) {
+  // Build CSV with BOM for Excel
+  const BOM = '﻿'
+  const headers = ['Centre', 'Date', 'Montant', 'Banque', 'Observations', 'Saisi par']
+  const rows = data.map(v => [
+    v.centre_nom,
+    v.date_versement,
+    v.montant,
+    v.banque || '',
+    v.observations || '',
+    v.saisi_par_nom || ''
+  ])
+  const csv = BOM + [headers, ...rows].map(r =>
+    r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(';')
+  ).join('\n')
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `versements_${new Date().toISOString().slice(0,10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function Admin() {
   const [versements, setVersements] = useState({ data: [], total: 0, page: 1, pages: 1 })
   const [centres, setCentres] = useState([])
@@ -25,6 +50,7 @@ export default function Admin() {
   function loadData() {
     const params = new URLSearchParams()
     params.set('page', page)
+    params.set('limit', 200)
     if (filters.centre_id) params.set('centre_id', filters.centre_id)
     if (filters.date_debut) params.set('date_debut', filters.date_debut)
     if (filters.date_fin) params.set('date_fin', filters.date_fin)
@@ -103,6 +129,13 @@ export default function Admin() {
             <div className="card-title" style={{ margin: 0, border: 0, padding: 0 }}>
               {versements.total} versement{versements.total > 1 ? 's' : ''}
             </div>
+            <div className="export-bar">
+              <button className="btn btn-accent btn-sm"
+                onClick={() => exportExcel(versements.data, centres)}
+                disabled={versements.data.length === 0}>
+                ⬇ Télécharger Excel
+              </button>
+            </div>
           </div>
 
           <div className="table-wrap">
@@ -113,7 +146,7 @@ export default function Admin() {
                   <th>Date</th>
                   <th>Montant</th>
                   <th>Banque</th>
-                  <th>N° Bordereau</th>
+                  <th>Observations</th>
                   <th>Saisi par</th>
                   <th>Image</th>
                 </tr>
@@ -130,7 +163,7 @@ export default function Admin() {
                     <td>{v.date_versement}</td>
                     <td className="montant">{formatMontant(v.montant)}</td>
                     <td>{v.banque || '—'}</td>
-                    <td>{v.numero_bordereau || '—'}</td>
+                    <td>{v.observations || '—'}</td>
                     <td>{v.saisi_par_nom || '—'}</td>
                     <td>
                       {v.a_image ? (
@@ -210,10 +243,13 @@ export default function Admin() {
         </>
       )}
 
-      {/* Modal image */}
+      {/* Modal image amélioré */}
       {selectedImage && (
         <div className="modal-overlay" onClick={() => setSelectedImage(null)}>
-          <img src={selectedImage} alt="Bordereau" />
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setSelectedImage(null)}>✕</button>
+            <img src={selectedImage} alt="Reçu de versement" />
+          </div>
         </div>
       )}
     </div>
