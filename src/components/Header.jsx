@@ -1,6 +1,7 @@
 import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { getUser, logout } from '../utils/api'
+import logoSnde from '../logo-snde.js'
 
 export default function Header() {
   const navigate = useNavigate()
@@ -15,7 +16,7 @@ export default function Header() {
   return (
     <div className="header">
       <div className="header-left">
-        <img src="/logo-snde.png" alt="SNDE" className="header-logo" />
+        <img src={logoSnde} alt="SNDE" className="header-logo" />
         <h1>Versements Bancaires</h1>
       </div>
       <div className="header-right">
