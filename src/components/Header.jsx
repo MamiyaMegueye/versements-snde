@@ -42,7 +42,6 @@ export default function Header() {
             Saisie
           </span>
         )}
-        <span className="header-user">{user?.nom_complet}</span>
         <span className="header-nav" onClick={handleLogout}>Déconnexion</span>
       </div>
     </div>
